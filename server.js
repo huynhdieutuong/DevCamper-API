@@ -8,6 +8,7 @@ const app = express();
 
 // Route files
 const bootcamps = require('./routes/bootcamps');
+const courses = require('./routes/courses');
 
 // Body parser
 app.use(express.json());
@@ -22,6 +23,7 @@ connectDB();
 
 // Mount routes
 app.use('/api/v1/bootcamps', bootcamps);
+app.use('/api/v1/courses', courses);
 
 // Error Handler
 app.use(errorHandler);

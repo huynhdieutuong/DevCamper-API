@@ -69,3 +69,13 @@ const sendTokenResponse = (user, statusCode, res) => {
       token
     });
 };
+
+// @desc    Get logged in user
+// @route   GET /api/v1/auth/me
+// @access  Private
+exports.getMe = asyncHandler(async (req, res, next) => {
+  res.status(200).json({
+    success: true,
+    data: req.user
+  });
+});

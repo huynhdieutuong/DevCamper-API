@@ -95,6 +95,10 @@ exports.confirmationEmail = asyncHandler(async (req, res, next) => {
 // @route   GET /api/v1/auth/resend
 // @access  Private
 exports.resendToken = asyncHandler(async (req, res, next) => {
+  if (req.user.isVerified) {
+    return next(new ErrorResponse('Account already verified', 400));
+  }
+
   // Check if token expired and delete
   const expiredToken = await Token.findOne({ user: req.user._id });
   if (expiredToken) {

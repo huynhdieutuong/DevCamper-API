@@ -252,6 +252,61 @@ exports.updatePassword = asyncHandler(async (req, res, next) => {
   sendTokenResponse(user, 200, res);
 });
 
+// @desc    Update user email
+// @route   POST /api/v1/auth/updateemail
+// @access  Private
+exports.updateEmail = asyncHandler(async (req, res, next) => {
+  const { newEmail } = req.body;
+
+  // Check if not new email
+  if (!newEmail) {
+    return next(new ErrorResponse('Please enter a new email', 400));
+  }
+
+  // Check if duplicate current email
+  if (newEmail === req.user.email) {
+    return next(new ErrorResponse('This is your current email', 400));
+  }
+
+  // Create token
+  const token = crypto.randomBytes(16).toString('hex');
+
+  await Token.create({
+    user: req.user._id,
+    email: newEmail,
+    token: crypto
+      .createHash('sha256')
+      .update(token)
+      .digest('hex'),
+    tokenExpire:
+      Date.now() + process.env.VERIFICATION_TOKEN_EXPIRE * 60 * 60 * 1000
+  });
+
+  // Send email
+  const tokenUrl = `${req.protocol}://${req.get(
+    'host'
+  )}/api/v1/auth/confirmation/${token}`;
+
+  const message = `Hello ${req.user.name}, \n\n Please verify your account by clicking the link below: \n\n ${tokenUrl}`;
+
+  try {
+    await sendEmail({
+      email: newEmail,
+      subject: 'Confirm to update email',
+      message
+    });
+
+    res.status(200).json({
+      success: true,
+      data: `A verification email has been sent to ${newEmail}.`
+    });
+  } catch (error) {
+    console.error(error);
+
+    return next(new ErrorResponse('Verification email could not be sent', 500));
+  }
+});
+
 // Get token from model, create cookie and send response
 const sendTokenResponse = (user, statusCode, res) => {
   // Create token

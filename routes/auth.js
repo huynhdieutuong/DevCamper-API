@@ -11,6 +11,7 @@ const {
   resetPassword,
   updateDetails,
   updatePassword,
+  updateEmail,
   confirmationEmail,
   resendToken
 } = require('../controllers/auth');
@@ -28,6 +29,8 @@ router.route('/me').get(protect, getMe);
 router.route('/updatedetails').put(protect, updateDetails);
 
 router.route('/updatepassword').put(protect, updatePassword);
+
+router.route('/updateemail').post(protect, updateEmail);
 
 router.route('/forgotpassword').post(forgotPassword);
 

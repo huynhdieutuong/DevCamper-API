@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const ErrorResponse = require('../utils/errorResponse');
 const asyncHandler = require('../middlewares/async');
 const User = require('../models/User');
+const Token = require('../models/Token');
 
 const sendEmail = require('../utils/sendEmail');
 
@@ -19,6 +20,74 @@ exports.register = asyncHandler(async (req, res, next) => {
     role
   });
 
+  // Create a verification token for this user
+  const token = crypto.randomBytes(16).toString('hex');
+
+  await Token.create({
+    user: user._id,
+    email: user.email,
+    token: crypto
+      .createHash('sha256')
+      .update(token)
+      .digest('hex'),
+    tokenExpire:
+      Date.now() + process.env.VERIFICATION_TOKEN_EXPIRE * 60 * 60 * 1000
+  });
+
+  // Send email
+  const tokenUrl = `${req.protocol}://${req.get(
+    'host'
+  )}/api/v1/auth/confirmation/${token}`;
+
+  const message = `Hello ${user.name},\n\n Please verify your account by clicking the link below: \n\n ${tokenUrl}`;
+
+  try {
+    await sendEmail({
+      email: user.email,
+      subject: 'Account verification token',
+      message
+    });
+
+    res.status(200).json({
+      success: true,
+      data: `A verification email has been sent to ${user.email}.`
+    });
+  } catch (error) {
+    console.error(error);
+
+    return next(new ErrorResponse('Verification email could not be sent', 500));
+  }
+});
+
+// @desc    Confirmation email
+// @route   GET /api/v1/auth/confirmation/:token
+// @access  Public
+exports.confirmationEmail = asyncHandler(async (req, res, next) => {
+  // Get hashed token
+  const confirmationToken = crypto
+    .createHash('sha256')
+    .update(req.params.token)
+    .digest('hex');
+
+  // Check token
+  const token = await Token.findOne({
+    token: confirmationToken,
+    tokenExpire: { $gt: Date.now() }
+  });
+  if (!token) {
+    return next(new ErrorResponse('Invalid token', 400));
+  }
+
+  // Update status verified and email
+  const user = await User.findByIdAndUpdate(
+    token.user,
+    { isVerified: true, email: token.email },
+    { runValidators: true, new: true }
+  );
+
+  // Delete token
+  await Token.findByIdAndDelete(token._id);
+
   sendTokenResponse(user, 200, res);
 });
 
@@ -34,7 +103,7 @@ exports.login = asyncHandler(async (req, res, next) => {
   }
 
   // Check for user
-  const user = await User.findOne({ email }).select('password');
+  const user = await User.findOne({ email }).select('+password');
   if (!user) {
     return next(new ErrorResponse('Invalid credentials', 401));
   }
@@ -43,6 +112,11 @@ exports.login = asyncHandler(async (req, res, next) => {
   const isMatch = await user.matchPassword(password);
   if (!isMatch) {
     return next(new ErrorResponse('Invalid credentials', 401));
+  }
+
+  // Make sure the user has been verified
+  if (!user.isVerified) {
+    return next(new ErrorResponse('Your account has not been verified', 401));
   }
 
   sendTokenResponse(user, 200, res);

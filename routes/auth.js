@@ -10,10 +10,16 @@ const {
   forgotPassword,
   resetPassword,
   updateDetails,
-  updatePassword
+  updatePassword,
+  confirmationEmail,
+  resendToken
 } = require('../controllers/auth');
 
 router.route('/register').post(register);
+
+router.route('/confirmation/:token').get(confirmationEmail);
+
+// router.route('/resend').get(protect, resendToken);
 
 router.route('/login').post(login);
 

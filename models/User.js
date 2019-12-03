@@ -22,6 +22,10 @@ const UserSchema = new mongoose.Schema({
     enum: ['user', 'publisher'],
     default: 'user'
   },
+  isVerified: {
+    type: Boolean,
+    default: false
+  },
   password: {
     type: String,
     required: [true, 'Please add a password'],
@@ -67,8 +71,9 @@ UserSchema.methods.getResetPasswordToken = function() {
     .update(resetToken)
     .digest('hex');
 
-  // Set expire to 10 mins
-  this.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
+  // Set expire
+  this.resetPasswordExpire =
+    Date.now() + process.env.RESET_PASSWORD_TOKEN_EXPIRE * 60 * 60 * 1000;
 
   return resetToken;
 };

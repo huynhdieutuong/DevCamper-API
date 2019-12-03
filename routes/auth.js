@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { protect } = require('../middlewares/auth');
+const { protect, protectResend } = require('../middlewares/auth');
 
 const {
   register,
@@ -20,7 +20,7 @@ router.route('/register').post(register);
 
 router.route('/confirmation/:token').get(confirmationEmail);
 
-// router.route('/resend').get(protect, resendToken);
+router.route('/resend').get(protectResend, resendToken);
 
 router.route('/login').post(login);
 

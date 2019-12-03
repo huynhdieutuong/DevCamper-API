@@ -91,6 +91,55 @@ exports.confirmationEmail = asyncHandler(async (req, res, next) => {
   sendTokenResponse(user, 200, res);
 });
 
+// @desc    Resend verification email
+// @route   GET /api/v1/auth/resend
+// @access  Private
+exports.resendToken = asyncHandler(async (req, res, next) => {
+  // Check if token expired and delete
+  const expiredToken = await Token.findOne({ user: req.user._id });
+  if (expiredToken) {
+    await Token.findByIdAndDelete(expiredToken._id);
+  }
+
+  // Create new token
+  const token = crypto.randomBytes(16).toString('hex');
+
+  await Token.create({
+    user: req.user._id,
+    email: req.user.email,
+    token: crypto
+      .createHash('sha256')
+      .update(token)
+      .digest('hex'),
+    tokenExpire:
+      Date.now() + process.env.VERIFICATION_TOKEN_EXPIRE * 60 * 60 * 1000
+  });
+
+  // Send email
+  const tokenUrl = `${req.protocol}://${req.get(
+    'host'
+  )}/api/v1/auth/confirmation/${token}`;
+
+  const message = `Hello ${req.user.name},\n\n Please verify your account by clicking the link below: \n\n ${tokenUrl}`;
+
+  try {
+    await sendEmail({
+      email: req.user.email,
+      subject: 'Resend verification email',
+      message
+    });
+
+    res.status(200).json({
+      success: true,
+      data: `A verification email has been sent to ${req.user.email}.`
+    });
+  } catch (error) {
+    console.error(error);
+
+    return next(new ErrorResponse('Verification email could not be sent', 500));
+  }
+});
+
 // @desc    Login user
 // @route   POST /api/v1/auth/login
 // @access  Public
@@ -112,11 +161,6 @@ exports.login = asyncHandler(async (req, res, next) => {
   const isMatch = await user.matchPassword(password);
   if (!isMatch) {
     return next(new ErrorResponse('Invalid credentials', 401));
-  }
-
-  // Make sure the user has been verified
-  if (!user.isVerified) {
-    return next(new ErrorResponse('Your account has not been verified', 401));
   }
 
   sendTokenResponse(user, 200, res);
